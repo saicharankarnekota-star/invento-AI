@@ -1,0 +1,299 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - INVENTO AI{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="fa-solid fa-chart-line"></i> Inventory Overview</h1>
+            <p class="page-subtitle">Real-time stock monitoring, AI detection insights, and expiry status</p>
+        </div>
+        <div class="header-actions">
+            <a href="{{ url_for('scan') }}" class="btn btn-primary">
+                <i class="fa-solid fa-camera"></i> AI Shelf Scan
+            </a>
+            <a href="{{ url_for('billing') }}" class="btn btn-success"><i class="fa-solid fa-bolt"></i> New Bill</a>
+            <a href="{{ url_for('add_product') }}" class="btn btn-outline">
+                <i class="fa-solid fa-plus"></i> Add Product
+            </a>
+        </div>
+    </div>
+
+    <!-- Metric Stat Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon icon-blue">
+                <i class="fa-solid fa-box-open"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Total Products</span>
+                <h3 class="stat-value">{{ total_products }}</h3>
+                <span class="stat-meta">Active catalog items</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon icon-green">
+                <i class="fa-solid fa-cubes-stacked"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Total Stock Units</span>
+                <h3 class="stat-value">{{ total_stock }}</h3>
+                <span class="stat-meta">In-store inventory</span>
+            </div>
+        </div>
+
+        <div class="stat-card {% if low_stock_count > 0 %}stat-alert{% endif %}">
+            <div class="stat-icon icon-red">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Low Stock Alerts</span>
+                <h3 class="stat-value">{{ low_stock_count }}</h3>
+                <span class="stat-meta"><a href="{{ url_for('alerts') }}" class="text-danger">Action required &rarr;</a></span>
+            </div>
+        </div>
+
+        <div class="stat-card {% if expired_count > 0 %}stat-alert{% endif %}">
+            <div class="stat-icon icon-purple">
+                <i class="fa-solid fa-calendar-xmark"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Expiry Alerts</span>
+                <h3 class="stat-value">
+                    {% if expired_count > 0 %}
+                    <span class="text-danger">{{ expired_count }} Expired</span>
+                    {% elif expiring_soon_count > 0 %}
+                    <span class="text-warning">{{ expiring_soon_count }} Expiring</span>
+                    {% else %}
+                    <span class="text-success">0 Issues</span>
+                    {% endif %}
+                </h3>
+                <span class="stat-meta"><a href="{{ url_for('alerts') }}">View shelf life &rarr;</a></span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon icon-purple">
+                <i class="fa-solid fa-indian-rupee-sign"></i>
+            </div>
+            <div class="stat-info">
+                <span class="stat-label">Inventory Valuation</span>
+                <h3 class="stat-value">&#8377;{{ "{:,.2f}".format(total_valuation) }}</h3>
+                <span class="stat-meta">Total asset value</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Split Layout -->
+    <div class="dashboard-grid">
+        <!-- Left Column: Critical Stock Items & Expiry Watchlist -->
+        <div class="dashboard-column">
+            <!-- Expiry Watchlist Widget -->
+            <div class="card border-warning">
+                <div class="card-header bg-warning-light">
+                    <h3><i class="fa-solid fa-clock-rotate-left text-warning"></i> Product Expiry Watchlist</h3>
+                    <a href="{{ url_for('alerts') }}" class="card-link">All Expiry Alerts &rarr;</a>
+                </div>
+                <div class="card-body">
+                    {% if expiring_items %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Stock</th>
+                                    <th>Expiry Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in expiring_items %}
+                                {% set exp = item.expiry_date|expiry_info %}
+                                <tr>
+                                    <td><strong>{{ item.name }}</strong></td>
+                                    <td>{{ item.quantity }} units</td>
+                                    <td>{{ item.expiry_date }}</td>
+                                    <td>
+                                        <span class="badge {{ exp.badge }}">
+                                            {% if exp.status == 'expired' %}
+                                            <i class="fa-solid fa-triangle-exclamation"></i>
+                                            {% else %}
+                                            <i class="fa-solid fa-hourglass-half"></i>
+                                            {% endif %}
+                                            {{ exp.label }}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fa-solid fa-circle-check text-success"></i>
+                        <p>No products expiring soon! All inventory is fresh.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Low Stock Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-bell text-warning"></i> Restock Needed Urgently</h3>
+                    <a href="{{ url_for('alerts') }}" class="card-link">View All Alerts &rarr;</a>
+                </div>
+                <div class="card-body">
+                    {% if low_stock_items %}
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Category</th>
+                                    <th>Stock</th>
+                                    <th>Reorder Pt</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in low_stock_items %}
+                                <tr>
+                                    <td><strong>{{ item.name }}</strong></td>
+                                    <td><span class="badge badge-light">{{ item.category }}</span></td>
+                                    <td>
+                                        <span class="badge {% if item.quantity == 0 %}badge-danger{% else %}badge-warning{% endif %}">
+                                            {{ item.quantity }} units
+                                        </span>
+                                    </td>
+                                    <td>{{ item.reorder_level }}</td>
+                                    <td>
+                                        <form method="POST" action="{{ url_for('restock_product', product_id=item.id) }}" style="display:inline;">
+                                            <input type="hidden" name="quantity" value="10">
+                                            <button type="submit" class="btn btn-sm btn-success" title="Quick Restock +10">
+                                                <i class="fa-solid fa-plus"></i> +10 Restock
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fa-solid fa-circle-check text-success"></i>
+                        <p>All stock levels are optimal! No immediate reorders needed.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Category Breakdown -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-layer-group"></i> Category Distribution</h3>
+                </div>
+                <div class="card-body">
+                    <div class="category-bars">
+                        {% for cat in categories_data %}
+                        <div class="category-item">
+                            <div class="category-row">
+                                <span class="category-name">{{ cat.category }}</span>
+                                <span class="category-count">{{ cat.stock }} units ({{ cat.count }} items)</span>
+                            </div>
+                            <div class="progress-bar-bg">
+                                <div class="progress-bar-fill" style="width: {{ [10, (cat.stock / (total_stock if total_stock > 0 else 1) * 100)]|max }}%;"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Column: Recent AI Scans & Activity -->
+        <div class="dashboard-column">
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-camera-retro"></i> Recent AI Shelf Scans</h3>
+                    <a href="{{ url_for('scan') }}" class="card-link">New Scan &rarr;</a>
+                </div>
+                <div class="card-body">
+                    {% if recent_scans %}
+                    <div class="recent-scans-list">
+                        {% for scan in recent_scans %}
+                        <div class="scan-history-card">
+                            <div class="scan-thumb">
+                                <img src="{{ url_for('static', filename='uploads/' + scan.annotated_image) }}" alt="Scan thumbnail">
+                            </div>
+                            <div class="scan-details">
+                                <div class="scan-meta">
+                                    <span class="scan-time"><i class="fa-regular fa-clock"></i> {{ scan.timestamp }}</span>
+                                    <span class="badge badge-success">{{ scan.total_items }} Detected</span>
+                                </div>
+                                <div class="scan-tags">
+                                    {% set counts = scan.detected_counts|from_json if scan.detected_counts else {} %}
+                                    {% for key, val in counts.items() %}
+                                    <span class="tag-pill">{{ key }}: <strong>{{ val }}</strong></span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state">
+                        <i class="fa-solid fa-camera text-muted"></i>
+                        <p>No shelf scans performed yet.</p>
+                        <a href="{{ url_for('scan') }}" class="btn btn-sm btn-primary mt-2">Run First AI Scan</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Recent Bills -->
+            <div class="card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-receipt"></i> Recent Bills</h3>
+                    <a href="{{ url_for('bills') }}" class="card-link">All Bills <i class="fa-solid fa-arrow-right"></i></a>
+                </div>
+                <div class="card-body">
+                    {% if recent_bills %}
+                    <div class="today-strip"><span>Today's sales</span><strong>&#8377;{{ "{:,.2f}".format(today_sales) }}</strong><span class="small text-muted">{{ today_bills }} bill{{ '' if today_bills == 1 else 's' }}</span></div>
+                    <div class="recent-bills">
+                        {% for b in recent_bills %}
+                        <a class="recent-bill" href="{{ url_for('bill_detail', bill_id=b.id) }}">
+                            <div><strong>{{ b.bill_no }}</strong><span class="small text-muted">{{ b.created_at|fmt_date }}, {{ b.created_at|fmt_time }} &middot; {{ b.customer_name }}</span></div>
+                            <strong>&#8377;{{ "{:,.2f}".format(b.total) }}</strong>
+                        </a>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-state"><p>No bills yet.</p><a href="{{ url_for('billing') }}" class="btn btn-success btn-sm">Create the first bill</a></div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- AI Model Info Card -->
+            <div class="card ai-status-card">
+                <div class="card-header">
+                    <h3><i class="fa-solid fa-brain text-info"></i> AI Vision & Shelf Life Engine</h3>
+                </div>
+                <div class="card-body">
+                    <div class="ai-status-row">
+                        <span class="status-indicator active"></span>
+                        <strong>Vision & Expiry Pipeline:</strong>
+                        <span>YOLOv8 + Real-Time Expiration Tracker</span>
+                    </div>
+                    <p class="text-secondary small mt-2">
+                        Real-time automated edge detection, object localization, shelf counting, and automated shelf life degradation warnings.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

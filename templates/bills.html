@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Bill History - INVENTO AI{% endblock %}
+
+{% block content %}
+<div class="bills-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="fa-solid fa-receipt"></i> Bill history</h1>
+            <p class="page-subtitle">Every bill with its ID, items sold, discount, GST, total, date and time.</p>
+        </div>
+        <div class="header-actions">
+            <a href="{{ url_for('billing') }}" class="btn btn-primary"><i class="fa-solid fa-bolt"></i> New bill</a>
+        </div>
+    </div>
+
+    <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon icon-green"><i class="fa-solid fa-indian-rupee-sign"></i></div><div class="stat-info"><span class="stat-label">Today's sales</span><h3 class="stat-value">&#8377;{{ "{:,.2f}".format(today_sales) }}</h3><span class="stat-meta">{{ today_count }} bill{{ '' if today_count == 1 else 's' }} today</span></div></div>
+        <div class="stat-card"><div class="stat-icon icon-blue"><i class="fa-solid fa-receipt"></i></div><div class="stat-info"><span class="stat-label">All-time bills</span><h3 class="stat-value">{{ all_count }}</h3><span class="stat-meta">Since the first sale</span></div></div>
+        <div class="stat-card"><div class="stat-icon icon-purple"><i class="fa-solid fa-wallet"></i></div><div class="stat-info"><span class="stat-label">All-time sales</span><h3 class="stat-value">&#8377;{{ "{:,.2f}".format(all_sales) }}</h3><span class="stat-meta">Including GST</span></div></div>
+    </div>
+
+    <div class="card filter-card"><div class="card-body">
+        <form method="GET" action="{{ url_for('bills') }}" class="search-filter-form">
+            <div class="search-input-wrap">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" name="q" value="{{ q }}" placeholder="Search by bill ID, customer name or phone..." class="form-control">
+            </div>
+            <input type="date" name="date" value="{{ day }}" class="form-control" style="width:auto" aria-label="Filter by date">
+            <button type="submit" class="btn btn-primary">Filter</button>
+            {% if q or day %}<a href="{{ url_for('bills') }}" class="btn btn-outline">Clear</a>{% endif %}
+        </form>
+    </div></div>
+
+    <div class="card"><div class="card-body" style="padding:0">
+        {% if bills %}
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead><tr><th>Bill ID</th><th>Date</th><th>Time</th><th>Customer</th><th>Items bought</th><th>Units</th><th>Type</th><th>Payment</th><th class="text-right">Discount</th><th class="text-right">GST</th><th class="text-right">Total</th><th></th></tr></thead>
+                <tbody>
+                {% for b in bills %}
+                <tr>
+                    <td><a href="{{ url_for('bill_detail', bill_id=b.id) }}" class="font-weight-bold">{{ b.bill_no }}</a></td>
+                    <td>{{ b.created_at|fmt_date }}</td>
+                    <td>{{ b.created_at|fmt_time }}</td>
+                    <td>{{ b.customer_name }}{% if b.customer_phone %}<div class="small text-muted">{{ b.customer_phone }}</div>{% endif %}</td>
+                    <td class="bill-items-cell" title="{{ b.items_text }}">{{ b.items_text }}</td>
+                    <td>{{ b.units }}</td>
+                    <td><span class="badge {{ 'badge-warning' if b.order_type == 'delivery' else 'badge-light' }}">{{ 'Delivery' if b.order_type == 'delivery' else 'In-store' }}</span></td>
+                    <td><span class="badge badge-light">{{ b.payment_method }}</span>{% if b.payment_ref and b.payment_ref != b.payment_method %}<div class="small text-muted">{{ b.payment_ref }}</div>{% endif %}</td>
+                    <td class="text-right">{% if b.discount_amount %}&minus;&#8377;{{ "{:,.2f}".format(b.discount_amount) }}{% else %}<span class="text-muted">&ndash;</span>{% endif %}</td>
+                    <td class="text-right">&#8377;{{ "{:,.2f}".format(b.gst_amount or 0) }}</td>
+                    <td class="text-right"><strong>&#8377;{{ "{:,.2f}".format(b.total) }}</strong></td>
+                    <td class="text-right"><a href="{{ url_for('bill_detail', bill_id=b.id) }}" class="btn btn-outline btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-receipt text-muted"></i>
+            <h4>{% if q or day %}No bills match your filters{% else %}No bills yet{% endif %}</h4>
+            <p>{% if q or day %}Try a different search or date.{% else %}Bills appear here after you press <strong>Generate bill</strong> on the Billing page.{% endif %}</p>
+            {% if not (q or day) %}<a href="{{ url_for('billing') }}" class="btn btn-primary mt-2">Create the first bill</a>{% endif %}
+        </div>
+        {% endif %}
+    </div></div>
+</div>
+{% endblock %}

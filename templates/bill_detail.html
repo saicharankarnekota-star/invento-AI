@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "_macros.html" import thumb %}
+
+{% block title %}{{ bill.bill_no }} - INVENTO AI{% endblock %}
+
+{% block content %}
+<div class="invoice-wrap">
+    <div class="header-actions invoice-actions">
+        <a href="{{ url_for('bills') }}" class="btn btn-outline"><i class="fa-solid fa-arrow-left"></i> All bills</a>
+        <a href="{{ url_for('billing') }}" class="btn btn-outline"><i class="fa-solid fa-bolt"></i> New bill</a>
+        <button onclick="window.print()" class="btn btn-primary"><i class="fa-solid fa-print"></i> Print bill</button>
+    </div>
+
+    <article class="invoice">
+        <header class="invoice-head">
+            <div class="nav-brand invoice-brand"><span class="brand-icon"><i class="fa-solid fa-boxes-stacked"></i></span> INVENTO <span class="ai-badge">AI</span></div>
+            <div class="invoice-id"><span class="small text-muted">Bill ID</span><strong>{{ bill.bill_no }}</strong></div>
+        </header>
+
+        <dl class="invoice-meta">
+            <div><dt>Date</dt><dd>{{ bill.created_at|fmt_date }}</dd></div>
+            <div><dt>Time</dt><dd>{{ bill.created_at|fmt_time }}</dd></div>
+            <div><dt>Customer</dt><dd>{{ bill.customer_name }}{% if bill.customer_phone %} &middot; {{ bill.customer_phone }}{% endif %}</dd></div>
+            <div><dt>Payment</dt><dd>{{ bill.payment_method }} &middot; Paid{% if bill.payment_ref and bill.payment_ref != bill.payment_method %}<div class="small text-muted">{{ bill.payment_ref }}</div>{% endif %}</dd></div>
+            <div><dt>Order type</dt><dd>{{ 'Home delivery' if bill.order_type == 'delivery' else 'In-store' }}</dd></div>
+            <div><dt>Billed by</dt><dd>{{ bill.cashier or '-' }}</dd></div>
+            {% if bill.address %}<div class="invoice-address"><dt>Delivery address</dt><dd>{{ bill.address }}</dd></div>{% endif %}
+        </dl>
+
+        <table class="data-table invoice-table">
+            <thead><tr><th>Item</th><th class="text-right">Qty</th><th class="text-right">Price</th><th class="text-right">GST</th><th class="text-right">Amount</th></tr></thead>
+            <tbody>
+            {% for i in items %}
+            <tr>
+                <td><span class="invoice-item">{{ thumb(i, 'sm') }}<strong>{{ i.name }}</strong></span></td>
+                <td class="text-right">{{ i.quantity }}</td>
+                <td class="text-right">&#8377;{{ "{:,.2f}".format(i.unit_price) }}</td>
+                <td class="text-right">{{ '%g'|format(i.gst_rate or 0) }}%</td>
+                <td class="text-right">&#8377;{{ "{:,.2f}".format(i.subtotal) }}</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="invoice-sum">
+            <div class="bd-row"><span>Item total ({{ units }} unit{{ '' if units == 1 else 's' }})</span><span>&#8377;{{ "{:,.2f}".format(bill.subtotal) }}</span></div>
+            {% if bill.discount_amount %}<div class="bd-row bd-save"><span>Discount{% if bill.discount_type == 'percent' %} ({{ '%g'|format(bill.discount_value) }}%){% endif %}</span><span>&minus;&#8377;{{ "{:,.2f}".format(bill.discount_amount) }}</span></div>{% endif %}
+            <div class="bd-row"><span>CGST</span><span>&#8377;{{ "{:,.2f}".format(cgst) }}</span></div>
+            <div class="bd-row"><span>SGST</span><span>&#8377;{{ "{:,.2f}".format(sgst) }}</span></div>
+            {% if bill.order_type == 'delivery' %}<div class="bd-row"><span>Delivery fee</span><span>{% if bill.delivery_fee %}&#8377;{{ "{:,.2f}".format(bill.delivery_fee) }}{% else %}FREE{% endif %}</span></div>{% endif %}
+            <div class="bd-row bd-total"><span>Grand total</span><span class="invoice-total">&#8377;{{ "{:,.2f}".format(bill.total) }}</span></div>
+        </div>
+        <p class="invoice-thanks">Thank you for shopping with us.</p>
+    </article>
+</div>
+{% endblock %}

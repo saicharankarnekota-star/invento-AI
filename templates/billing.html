@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% from "_macros.html" import thumb %}
+
+{% macro ctl(p, n) -%}
+{%- if n -%}
+<div class="qc-stepper">
+    <form method="POST" action="{{ url_for('cart_update', product_id=p.id) }}" class="ajax-form"><input type="hidden" name="qty" value="{{ n - 1 }}"><button type="submit" aria-label="Remove one {{ p.name }}">&minus;</button></form>
+    <span>{{ n }}</span>
+    <form method="POST" action="{{ url_for('cart_add', product_id=p.id) }}" class="ajax-form"><button type="submit" aria-label="Add one more {{ p.name }}" {% if n >= p.quantity %}disabled{% endif %}>+</button></form>
+</div>
+{%- else -%}
+<form method="POST" action="{{ url_for('cart_add', product_id=p.id) }}" class="ajax-form"><button type="submit" class="qc-add" aria-label="Add {{ p.name }} to cart">ADD</button></form>
+{%- endif -%}
+{%- endmacro %}
+
+{% block title %}Quick Billing - INVENTO AI{% endblock %}
+
+{% block content %}
+{% set cat_icons = {'Beverages': 'fa-bottle-water', 'Dairy': 'fa-glass-water', 'Snacks': 'fa-cookie-bite', 'Personal Care': 'fa-pump-soap', 'Produce': 'fa-apple-whole'} %}
+<div class="qc-page">
+    <div class="qc-hero">
+        <div>
+            <h1 class="page-title"><i class="fa-solid fa-bolt"></i> Quick billing</h1>
+            <p class="page-subtitle">Tap to add, set a discount, and print the bill. GST is calculated for you.</p>
+        </div>
+        <div class="header-actions">
+            <span class="qc-eta"><i class="fa-solid fa-bolt"></i> Bill in under a minute</span>
+            <a href="{{ url_for('bills') }}" class="btn btn-outline"><i class="fa-solid fa-receipt"></i> Bill history</a>
+        </div>
+    </div>
+
+    <form method="GET" action="{{ url_for('billing') }}" class="qc-search">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="search" name="q" value="{{ q }}" placeholder='Search "milk", "snacks"... or scan a barcode and press Enter' class="form-control" aria-label="Search products">
+        {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+    </form>
+
+    <nav class="qc-cats" aria-label="Categories">
+        <a href="{{ url_for('billing', q=q) }}" class="qc-cat {% if not selected_category %}active{% endif %}"><i class="fa-solid fa-border-all"></i><span>All</span></a>
+        {% for c in categories %}
+        <a href="{{ url_for('billing', category=c, q=q) }}" class="qc-cat {% if c == selected_category %}active{% endif %}"><i class="fa-solid {{ cat_icons.get(c, 'fa-box') }}"></i><span>{{ c }}</span></a>
+        {% endfor %}
+    </nav>
+
+    <div class="pos-grid">
+        <section>
+            {% if products %}
+            <div class="pos-products">
+                {% for p in products %}
+                <div class="qc-tile" data-add="{{ url_for('cart_add', product_id=p.id) }}" data-update="{{ url_for('cart_update', product_id=p.id) }}" data-max="{{ p.quantity }}" data-name="{{ p.name }}" data-pid="{{ p.id }}">
+                    {{ thumb(p, 'lg') }}
+                    {% if p.quantity <= p.reorder_level %}<span class="qc-low">Only {{ p.quantity }} left</span>{% endif %}
+                    <div class="qc-name">{{ p.name }}</div>
+                    <div class="qc-sub">{{ p.category }} &middot; GST {{ '%g'|format(p.gst_rate or 0) }}%</div>
+                    <div class="qc-foot">
+                        <div class="qc-price">&#8377;{{ "{:,.2f}".format(p.price) }}</div>
+                        <div class="qc-ctl">{{ ctl(p, in_cart.get(p.id|string, 0)) }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="card"><div class="card-body empty-state">
+                <i class="fa-solid fa-box-open text-muted"></i>
+                <h4>No sellable products found</h4>
+                <p>Out-of-stock and expired items are hidden. Try another search, or restock from the Alerts page.</p>
+            </div></div>
+            {% endif %}
+        </section>
+
+        <aside class="card cart-panel" id="cartPanel">
+            <div class="card-header">
+                <h3><i class="fa-solid fa-basket-shopping"></i> My cart</h3>
+                <span class="badge badge-light" id="cartCountBadge">{{ cart_count }} item{{ '' if cart_count == 1 else 's' }}</span>
+            </div>
+            <div class="card-body">
+                <div id="cartDynamic">{% include "_cart_dynamic.html" %}</div>
+
+                <form method="POST" action="{{ url_for('checkout') }}" id="checkoutForm" class="checkout-form" data-upi="{{ merchant_upi }}" data-merchant="{{ merchant_name }}" {% if not cart_items %}hidden{% endif %}>
+                    <div class="form-group">
+                        <label for="customer_name">Customer name</label>
+                        <input type="text" id="customer_name" name="customer_name" class="form-control" placeholder="Walk-in Customer" maxlength="80">
+                    </div>
+                    <div class="form-group">
+                        <label for="customer_phone">Phone (optional)</label>
+                        <input type="tel" id="customer_phone" name="customer_phone" class="form-control" maxlength="20">
+                    </div>
+                    <div class="form-group" id="addressWrap" {% if order_type != 'delivery' %}hidden{% endif %}>
+                        <label for="address">Delivery address</label>
+                        <textarea id="address" name="address" class="form-control" rows="2" maxlength="200" placeholder="House no, street, area"></textarea>
+                    </div>
+                    <div class="pay-methods">
+                        {% for m, icon in [('Cash','fa-money-bill-wave'),('UPI','fa-mobile-screen'),('Card','fa-credit-card')] %}
+                        <label class="radio-label"><input type="radio" name="payment_method" value="{{ m }}" {% if loop.first %}checked{% endif %}><span><i class="fa-solid {{ icon }}"></i> {{ m }}</span></label>
+                        {% endfor %}
+                    </div>
+
+                    <div class="pay-panel" id="pay-Cash">
+                        <label for="cash_received">Cash received (optional)</label>
+                        <input type="number" id="cash_received" name="cash_received" class="form-control" min="0" step="0.01" inputmode="decimal" placeholder="e.g. 500">
+                        <div class="pay-change" id="cashChange" aria-live="polite"></div>
+                    </div>
+
+                    <div class="pay-panel" id="pay-UPI" hidden>
+                        <div class="upi-box">
+                            <div id="upiQr" class="upi-qr" role="img" aria-label="UPI payment QR code"></div>
+                            <div class="upi-info">
+                                <strong>{{ merchant_upi }}</strong>
+                                <span class="small text-muted">Customer scans and pays <strong>&#8377;<span id="upiAmt">0.00</span></strong></span>
+                                <a id="upiLink" href="#" class="small">Open in UPI app</a>
+                            </div>
+                        </div>
+                        <label for="upi_txn_id">UPI transaction ID (UTR)</label>
+                        <input type="text" id="upi_txn_id" name="upi_txn_id" class="form-control" maxlength="30" autocomplete="off" placeholder="Shown on the customer's phone after paying">
+                        <label for="customer_upi" class="mt-2">Customer UPI ID (optional)</label>
+                        <input type="text" id="customer_upi" name="customer_upi" class="form-control" maxlength="60" autocomplete="off" placeholder="name@bank">
+                    </div>
+
+                    <div class="pay-panel" id="pay-Card" hidden>
+                        <div class="demo-note"><i class="fa-solid fa-shield-halved"></i> Demo checkout: card details are checked and then discarded. Only the card type and last 4 digits are saved. No money is charged.</div>
+                        <label for="card_number">Card number <span class="small text-muted" id="cardBrand"></span></label>
+                        <input type="text" id="card_number" name="card_number" class="form-control" inputmode="numeric" autocomplete="cc-number" maxlength="23" placeholder="1234 5678 9012 3456">
+                        <label for="card_name" class="mt-2">Name on card</label>
+                        <input type="text" id="card_name" name="card_name" class="form-control" autocomplete="cc-name" maxlength="60">
+                        <div class="card-row">
+                            <div><label for="card_expiry">Expiry</label><input type="text" id="card_expiry" name="card_expiry" class="form-control" inputmode="numeric" autocomplete="cc-exp" maxlength="5" placeholder="MM/YY"></div>
+                            <div><label for="card_cvv">CVV</label><input type="password" id="card_cvv" name="card_cvv" class="form-control" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="123"></div>
+                        </div>
+                        <div class="small pay-error" id="cardError" role="alert"></div>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-block btn-pay"><span>Pay &#8377;<span id="payAmount">{{ '%.2f'|format(totals.total) }}</span></span><span>Generate bill <i class="fa-solid fa-arrow-right"></i></span></button>
+                </form>
+                <form method="POST" action="{{ url_for('cart_clear') }}" class="ajax-form mt-2" id="clearForm" {% if not cart_items %}hidden{% endif %}>
+                    <button type="submit" class="btn btn-outline btn-sm btn-block">Clear cart</button>
+                </form>
+            </div>
+        </aside>
+    </div>
+</div>
+{% endblock %}

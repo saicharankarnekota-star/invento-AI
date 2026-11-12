@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Create Account - INVENTO AI{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    {% include "_auth_brand.html" %}
+    <section class="auth-side">
+        <div class="auth-card">
+            <div class="auth-header">
+                <h2>Create your account</h2>
+                <p>Your name appears on every bill you generate.</p>
+            </div>
+            <form method="POST" action="{{ url_for('register') }}" class="auth-form">
+                <div class="form-group">
+                    <label for="name"><i class="fa-solid fa-user"></i> Full name</label>
+                    <input type="text" id="name" name="name" class="form-control" value="{{ form_name }}" placeholder="Priya Sharma" required autofocus autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <label for="email"><i class="fa-solid fa-envelope"></i> Email</label>
+                    <input type="email" id="email" name="email" class="form-control" value="{{ form_email }}" placeholder="you@example.com" required autocomplete="email">
+                </div>
+                <div class="form-group">
+                    <label for="password"><i class="fa-solid fa-lock"></i> Password</label>
+                    <input type="password" id="password" name="password" class="form-control" minlength="6" placeholder="At least 6 characters" required autocomplete="new-password">
+                </div>
+                <div class="form-group">
+                    <label for="confirm_password"><i class="fa-solid fa-lock"></i> Confirm password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" class="form-control" minlength="6" required autocomplete="new-password">
+                </div>
+                <button type="submit" class="btn btn-primary btn-block"><span>Create account</span> <i class="fa-solid fa-user-plus"></i></button>
+            </form>
+            <p class="auth-switch">Already have an account? <a href="{{ url_for('login') }}">Sign in</a></p>
+        </div>
+    </section>
+</div>
+{% endblock %}

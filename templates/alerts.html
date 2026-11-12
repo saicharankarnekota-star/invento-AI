@@ -1,0 +1,280 @@
+{% extends "base.html" %}
+
+{% block title %}Stock & Expiry Alerts - INVENTO AI{% endblock %}
+
+{% block content %}
+<div class="alerts-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="fa-solid fa-triangle-exclamation text-warning"></i> Inventory & Expiry Alerts</h1>
+            <p class="page-subtitle">Real-time alerts for replenishment thresholds, shelf life expiration, and spoilage risks</p>
+        </div>
+        <div class="header-actions">
+            <a href="{{ url_for('products') }}" class="btn btn-outline">
+                <i class="fa-solid fa-boxes-packing"></i> View All Products
+            </a>
+        </div>
+    </div>
+
+    <!-- Alert Summary Cards (4 Metrics) -->
+    <div class="stats-grid mb-4">
+        <div class="stat-card {% if expired_products %}stat-alert{% endif %}">
+            <div class="stat-icon icon-red"><i class="fa-solid fa-calendar-xmark"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Expired Items</span>
+                <h3 class="stat-value text-danger">{{ expired_products|length }}</h3>
+                <span class="stat-meta">Remove from shelf immediately</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon icon-purple"><i class="fa-solid fa-hourglass-half"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Expiring Soon</span>
+                <h3 class="stat-value text-warning">{{ expiring_soon_products|length }}</h3>
+                <span class="stat-meta">Expiring within 7 days</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon icon-red"><i class="fa-solid fa-ban"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Out of Stock</span>
+                <h3 class="stat-value">{{ out_of_stock|length }}</h3>
+                <span class="stat-meta">Zero inventory on shelf</span>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon icon-blue"><i class="fa-solid fa-boxes-stacked"></i></div>
+            <div class="stat-info">
+                <span class="stat-label">Low Stock</span>
+                <h3 class="stat-value">{{ low_stock|length }}</h3>
+                <span class="stat-meta">&le; Reorder point</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. EXPIRED PRODUCTS SECTION -->
+    <div class="card mb-4 border-danger">
+        <div class="card-header bg-danger-light">
+            <h3><i class="fa-solid fa-skull-crossbones text-danger"></i> Expired Products (Quality & Safety Critical)</h3>
+            <span class="badge badge-danger">{{ expired_products|length }} Items Expired</span>
+        </div>
+        <div class="card-body">
+            {% if expired_products %}
+            <p class="text-danger small mb-3">
+                <i class="fa-solid fa-triangle-exclamation"></i> <strong>Warning:</strong> The following items have passed their expiration date and must not be sold. Please dispose or write off stock immediately.
+            </p>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Current Stock</th>
+                            <th>Expiry Date</th>
+                            <th>Status</th>
+                            <th>Estimated Loss</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in expired_products %}
+                        {% set exp = p.expiry_date|expiry_info %}
+                        <tr>
+                            <td><strong class="text-danger">{{ p.name }}</strong></td>
+                            <td><span class="badge badge-light">{{ p.category }}</span></td>
+                            <td><strong>{{ p.quantity }} units</strong></td>
+                            <td><span class="text-danger font-weight-bold">{{ p.expiry_date }}</span></td>
+                            <td><span class="badge badge-danger"><i class="fa-solid fa-calendar-xmark"></i> {{ exp.label }}</span></td>
+                            <td><strong class="text-danger">&#8377;{{ "{:,.2f}".format(p.quantity * p.price) }}</strong></td>
+                            <td>
+                                <form method="POST" action="{{ url_for('dispose_product', product_id=p.id) }}" onsubmit="return confirm('Dispose of expired stock for {{ p.name }}? This sets quantity to 0.');" style="display:inline;">
+                                    <button type="submit" class="btn btn-sm btn-outline" style="color:#dc2626; border-color:#f87171;">
+                                        <i class="fa-solid fa-trash-can"></i> Dispose Stock
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-circle-check text-success"></i>
+                <p>No expired products detected in inventory!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 2. EXPIRING SOON SECTION -->
+    <div class="card mb-4 border-warning">
+        <div class="card-header bg-warning-light">
+            <h3><i class="fa-solid fa-clock-rotate-left text-warning"></i> Products Expiring Soon (Within 7 Days)</h3>
+            <span class="badge badge-warning">{{ expiring_soon_products|length }} Items</span>
+        </div>
+        <div class="card-body">
+            {% if expiring_soon_products %}
+            <p class="text-secondary small mb-3">
+                <i class="fa-solid fa-lightbulb text-warning"></i> <strong>Recommendation:</strong> Apply discounts or promotional bundles to expedite shelf turnover before these products expire.
+            </p>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Current Stock</th>
+                            <th>Expiry Date</th>
+                            <th>Days Remaining</th>
+                            <th>Value at Risk</th>
+                            <th>Suggested Strategy</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in expiring_soon_products %}
+                        {% set exp = p.expiry_date|expiry_info %}
+                        <tr>
+                            <td><strong>{{ p.name }}</strong></td>
+                            <td><span class="badge badge-light">{{ p.category }}</span></td>
+                            <td><span class="badge badge-warning">{{ p.quantity }} units</span></td>
+                            <td>{{ p.expiry_date }}</td>
+                            <td>
+                                <span class="badge badge-warning font-weight-bold">
+                                    <i class="fa-solid fa-hourglass-half"></i> {{ exp.label }}
+                                </span>
+                            </td>
+                            <td><strong>&#8377;{{ "{:,.2f}".format(p.quantity * p.price) }}</strong></td>
+                            <td>
+                                <span class="badge badge-light">
+                                    <i class="fa-solid fa-tag"></i> 20% - 40% Markdown
+                                </span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-circle-check text-success"></i>
+                <p>No products are expiring within the next 7 days!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 3. OUT OF STOCK SECTION -->
+    <div class="card mb-4 border-danger">
+        <div class="card-header bg-danger-light">
+            <h3><i class="fa-solid fa-circle-xmark text-danger"></i> Out of Stock Products (Quantity = 0)</h3>
+            <span class="badge badge-danger">Critical Reorder</span>
+        </div>
+        <div class="card-body">
+            {% if out_of_stock %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Current Stock</th>
+                            <th>Reorder Level</th>
+                            <th>Unit Price</th>
+                            <th>Quick Restock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in out_of_stock %}
+                        <tr>
+                            <td><strong class="text-danger">{{ p.name }}</strong></td>
+                            <td><span class="badge badge-light">{{ p.category }}</span></td>
+                            <td><span class="badge badge-danger">0 units</span></td>
+                            <td>{{ p.reorder_level }}</td>
+                            <td>&#8377;{{ "{:,.2f}".format(p.price) }}</td>
+                            <td>
+                                <form method="POST" action="{{ url_for('restock_product', product_id=p.id) }}" class="inline-restock-form">
+                                    <input type="number" name="quantity" value="{{ p.reorder_level * 2 }}" min="1" class="form-control form-control-sm" style="width: 80px;">
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        <i class="fa-solid fa-plus"></i> Restock
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-circle-check text-success"></i>
+                <p>No products are currently out of stock!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 4. LOW STOCK SECTION -->
+    <div class="card border-warning">
+        <div class="card-header bg-warning-light">
+            <h3><i class="fa-solid fa-triangle-exclamation text-warning"></i> Low Stock Warnings (Quantity &le; Reorder Level)</h3>
+            <span class="badge badge-warning">Replenishment Needed</span>
+        </div>
+        <div class="card-body">
+            {% if low_stock %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Current Stock</th>
+                            <th>Reorder Level</th>
+                            <th>Unit Price</th>
+                            <th>Deficit / Shortfall</th>
+                            <th>Quick Restock</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in low_stock %}
+                        <tr>
+                            <td><strong>{{ p.name }}</strong></td>
+                            <td><span class="badge badge-light">{{ p.category }}</span></td>
+                            <td>
+                                <span class="badge badge-warning">
+                                    {{ p.quantity }} units
+                                </span>
+                            </td>
+                            <td>{{ p.reorder_level }}</td>
+                            <td>&#8377;{{ "{:,.2f}".format(p.price) }}</td>
+                            <td>
+                                <span class="text-danger font-weight-bold">
+                                    -{{ p.reorder_level - p.quantity }} units below min
+                                </span>
+                            </td>
+                            <td>
+                                <form method="POST" action="{{ url_for('restock_product', product_id=p.id) }}" class="inline-restock-form">
+                                    <input type="number" name="quantity" value="10" min="1" class="form-control form-control-sm" style="width: 80px;">
+                                    <button type="submit" class="btn btn-sm btn-success">
+                                        <i class="fa-solid fa-plus"></i> Restock
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-circle-check text-success"></i>
+                <p>No products are currently below reorder levels. Inventory is healthy!</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

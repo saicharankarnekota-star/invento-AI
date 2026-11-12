@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+{% from "_macros.html" import thumb %}
+
+{% block title %}Products - INVENTO AI{% endblock %}
+
+{% block content %}
+<div class="products-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="fa-solid fa-boxes-packing"></i> Product Inventory Management</h1>
+            <p class="page-subtitle">View, search, filter, edit, and organize all shelf products</p>
+        </div>
+        <div class="header-actions">
+            <a href="{{ url_for('add_product') }}" class="btn btn-primary">
+                <i class="fa-solid fa-plus-circle"></i> Add New Product
+            </a>
+        </div>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div class="filter-card">
+        <form method="GET" action="{{ url_for('products') }}" class="search-filter-form">
+            <div class="search-input-wrap">
+                <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                <input type="text" name="q" value="{{ search_query }}" placeholder="Search by name, category, barcode or description..." class="form-control">
+            </div>
+
+            <div class="category-select-wrap">
+                <select name="category" class="form-control" onchange="this.form.submit()">
+                    <option value="">All Categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat }}" {% if selected_category == cat %}selected{% endif %}>{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="category-select-wrap">
+                <select name="expiry_status" class="form-control" onchange="this.form.submit()">
+                    <option value="">All Expiry Statuses</option>
+                    <option value="expired" {% if selected_expiry == 'expired' %}selected{% endif %}>🔴 Expired</option>
+                    <option value="expiring_soon" {% if selected_expiry == 'expiring_soon' %}selected{% endif %}>🟡 Expiring Soon (&le; 7 Days)</option>
+                    <option value="good" {% if selected_expiry == 'good' %}selected{% endif %}>🟢 Fresh / Good</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary">
+                <i class="fa-solid fa-filter"></i> Filter
+            </button>
+
+            {% if search_query or selected_category or selected_expiry %}
+            <a href="{{ url_for('products') }}" class="btn btn-outline" title="Clear Filters">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Products Table Card -->
+    <div class="card">
+        <div class="card-header">
+            <h3>Inventory Catalog ({{ products|length }} Items)</h3>
+            <span class="text-secondary small">Auto-monitored by INVENTO AI Engine</span>
+        </div>
+        <div class="card-body">
+            {% if products %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Product Name</th>
+                            <th>Category</th>
+                            <th>Barcode</th>
+                            <th>Stock Qty</th>
+                            <th>Stock Status</th>
+                            <th>Expiry Date</th>
+                            <th>Expiry Status</th>
+                            <th>Unit Price</th>
+                            <th>Total Value</th>
+                            <th>Last Updated</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in products %}
+                        <tr>
+                            <td>{{ p.id }}</td>
+                            <td>
+                              <div class="product-cell">
+                                {{ thumb(p, 'md') }}
+                                <div>
+                                <strong class="product-name-text">{{ p.name }}</strong>
+                                {% if p.description %}
+                                <div class="product-desc-text">{{ p.description }}</div>
+                                {% endif %}
+                                </div>
+                              </div>
+                            </td>
+                            <td><span class="badge badge-light">{{ p.category }}</span></td>
+                            <td><code class="barcode-text">{{ p.barcode or '—' }}</code></td>
+                            <td>
+                                <span class="stock-qty-val font-weight-bold">{{ p.quantity }}</span>
+                            </td>
+                            <td>
+                                {% if p.quantity == 0 %}
+                                <span class="badge badge-danger"><i class="fa-solid fa-circle-xmark"></i> Out of Stock</span>
+                                {% elif p.quantity <= p.reorder_level %}
+                                <span class="badge badge-warning"><i class="fa-solid fa-triangle-exclamation"></i> Low Stock</span>
+                                {% else %}
+                                <span class="badge badge-success"><i class="fa-solid fa-circle-check"></i> In Stock</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if p.expiry_date %}
+                                <span class="small font-weight-bold">{{ p.expiry_date }}</span>
+                                {% else %}
+                                <span class="text-muted small">Not Set</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% set exp = p.expiry_date|expiry_info %}
+                                <span class="badge {{ exp.badge }}">
+                                    {% if exp.status == 'expired' %}
+                                    <i class="fa-solid fa-triangle-exclamation"></i>
+                                    {% elif exp.status == 'expiring_soon' %}
+                                    <i class="fa-solid fa-clock-rotate-left"></i>
+                                    {% elif exp.status == 'good' %}
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    {% endif %}
+                                    {{ exp.label }}
+                                </span>
+                            </td>
+                            <td>&#8377;{{ "{:,.2f}".format(p.price) }}</td>
+                            <td><strong>&#8377;{{ "{:,.2f}".format(p.quantity * p.price) }}</strong></td>
+                            <td class="text-muted small">{{ p.last_updated }}</td>
+                            <td class="text-center">
+                                <div class="action-btn-group">
+                                    <a href="{{ url_for('edit_product', product_id=p.id) }}" class="btn-icon btn-icon-edit" title="Edit Product">
+                                        <i class="fa-solid fa-pen-to-square"></i>
+                                    </a>
+                                    <form method="POST" action="{{ url_for('delete_product', product_id=p.id) }}" onsubmit="return confirm('Are you sure you want to delete {{ p.name }}?');" style="display:inline;">
+                                        <button type="submit" class="btn-icon btn-icon-delete" title="Delete Product">
+                                            <i class="fa-solid fa-trash-can"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fa-solid fa-box-open text-muted"></i>
+                <p>No products found matching your search criteria.</p>
+                <a href="{{ url_for('add_product') }}" class="btn btn-primary mt-2">Add Your First Product</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

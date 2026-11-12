@@ -1,0 +1,65 @@
+{% from "_macros.html" import thumb %}
+<div id="cartState" data-order-type="{{ order_type }}" data-empty="{{ 'true' if not cart_items else 'false' }}" data-total="{{ '%.2f'|format(totals.total) }}">
+{% if cart_items %}
+    <ul class="cart-lines">
+        {% for it in cart_items %}
+        <li class="cart-line">
+            {{ thumb(it.product, 'sm') }}
+            <div class="cart-line-info">
+                <strong>{{ it.product.name }}</strong>
+                <span class="small text-muted">&#8377;{{ "{:,.2f}".format(it.price) }} &middot; GST {{ '%g'|format(it.gst_rate) }}%</span>
+                <form method="POST" action="{{ url_for('cart_update', product_id=it.product.id) }}" class="ajax-form qty-form">
+                    <button type="button" class="step-btn" data-step="-1" aria-label="Decrease quantity">&minus;</button>
+                    <input type="number" name="qty" min="0" max="{{ it.product.quantity }}" value="{{ it.qty }}" class="qty-input" aria-label="Quantity of {{ it.product.name }}" onchange="this.form.requestSubmit()">
+                    <button type="button" class="step-btn" data-step="1" aria-label="Increase quantity">+</button>
+                </form>
+            </div>
+            <div class="cart-line-end">
+                <strong>&#8377;{{ "{:,.2f}".format(it.subtotal) }}</strong>
+                <form method="POST" action="{{ url_for('cart_remove', product_id=it.product.id) }}" class="ajax-form">
+                    <button type="submit" class="btn-icon btn-icon-delete" title="Remove {{ it.product.name }}" aria-label="Remove {{ it.product.name }}"><i class="fa-solid fa-xmark"></i></button>
+                </form>
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+
+    <form method="POST" action="{{ url_for('cart_options') }}" class="ajax-form options-form">
+        <div class="seg">
+            <label class="seg-opt"><input type="radio" name="order_type" value="store" {% if order_type == 'store' %}checked{% endif %} onchange="this.form.requestSubmit()"><span><i class="fa-solid fa-store"></i> In-store</span></label>
+            <label class="seg-opt"><input type="radio" name="order_type" value="delivery" {% if order_type == 'delivery' %}checked{% endif %} onchange="this.form.requestSubmit()"><span><i class="fa-solid fa-motorcycle"></i> Delivery</span></label>
+        </div>
+        <div class="discount-row">
+            <label for="discount_value" class="small font-weight-bold"><i class="fa-solid fa-tag"></i> Discount</label>
+            <select name="discount_type" class="form-control form-control-sm" aria-label="Discount type">
+                <option value="percent" {% if discount.type == 'percent' %}selected{% endif %}>%</option>
+                <option value="flat" {% if discount.type == 'flat' %}selected{% endif %}>&#8377;</option>
+            </select>
+            <input type="number" id="discount_value" name="discount_value" min="0" step="0.01" value="{{ '%g'|format(discount.value) if discount.value else '' }}" placeholder="0" class="form-control form-control-sm">
+            <button type="submit" class="btn btn-outline btn-sm">Apply</button>
+        </div>
+    </form>
+
+    <div class="bill-details">
+        <h4>Bill details</h4>
+        <div class="bd-row"><span>Item total</span><span>&#8377;{{ "{:,.2f}".format(totals.subtotal) }}</span></div>
+        {% if totals.discount %}<div class="bd-row bd-save"><span>Discount{% if discount.type == 'percent' %} ({{ '%g'|format(discount.value) }}%){% endif %}</span><span>&minus;&#8377;{{ "{:,.2f}".format(totals.discount) }}</span></div>{% endif %}
+        {% if totals.gst %}
+        <div class="bd-row"><span>CGST</span><span>&#8377;{{ "{:,.2f}".format(totals.cgst) }}</span></div>
+        <div class="bd-row"><span>SGST</span><span>&#8377;{{ "{:,.2f}".format(totals.sgst) }}</span></div>
+        {% endif %}
+        {% if order_type == 'delivery' %}
+        <div class="bd-row"><span>Delivery fee</span><span>{% if totals.delivery_fee %}&#8377;{{ "{:,.2f}".format(totals.delivery_fee) }}{% else %}<em class="free">FREE</em>{% endif %}</span></div>
+        {% if totals.delivery_fee %}<div class="bd-hint">Add &#8377;{{ "{:,.0f}".format(free_delivery_above - (totals.subtotal - totals.discount)) }} more for free delivery</div>{% endif %}
+        {% endif %}
+        <div class="bd-row bd-total"><span>Grand total</span><span>&#8377;{{ "{:,.2f}".format(totals.total) }}</span></div>
+        {% if totals.discount %}<div class="bd-savings">You are saving &#8377;{{ "{:,.2f}".format(totals.discount) }} on this bill</div>{% endif %}
+    </div>
+{% else %}
+    <div class="empty-state">
+        <i class="fa-solid fa-basket-shopping text-muted"></i>
+        <h4>Your cart is empty</h4>
+        <p>Tap <strong>ADD</strong> on any product to start a bill.</p>
+    </div>
+{% endif %}
+</div>

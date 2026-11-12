@@ -1,0 +1,8 @@
+{% macro thumb(p, size='md') -%}
+{%- if p.image -%}
+{%- set src = p.image if p.image.startswith('img/') else 'uploads/products/' + p.image -%}
+<img class="pthumb pthumb-{{ size }}" src="{{ url_for('static', filename=src) }}" alt="{{ p.name }}" loading="lazy">
+{%- else -%}
+<span class="pthumb pthumb-{{ size }} pthumb-fallback" style="--h: {{ ((p.name|length) * 47 + ((p.category or '')|length) * 23) % 360 }}" aria-hidden="true">{{ p.name[:1]|upper }}</span>
+{%- endif -%}
+{%- endmacro %}

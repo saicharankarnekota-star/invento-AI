@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+
+{% block title %}AI Shelf Scan - INVENTO AI{% endblock %}
+
+{% block content %}
+<div class="scan-page">
+    <div class="page-header">
+        <div>
+            <h1 class="page-title"><i class="fa-solid fa-camera-retro"></i> AI Shelf Scanner & Product Detection</h1>
+            <p class="page-subtitle">Computer vision detection, barcode reading and automatic inventory counting</p>
+        </div>
+    </div>
+
+    <div class="scan-grid">
+        <!-- Scan Input Card -->
+        <div class="card scan-input-card">
+            <div class="card-header">
+                <h3><i class="fa-solid fa-upload"></i> Capture or Upload Shelf Image</h3>
+            </div>
+            <div class="card-body">
+                <!-- Tab Controls -->
+                <div class="tab-buttons">
+                    <button type="button" class="tab-btn active" id="tabUploadBtn" onclick="switchScanTab('upload')">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> Upload Image
+                    </button>
+                    <button type="button" class="tab-btn" id="tabWebcamBtn" onclick="switchScanTab('webcam')">
+                        <i class="fa-solid fa-video"></i> Live Webcam
+                    </button>
+                    <button type="button" class="tab-btn" id="tabSampleBtn" onclick="switchScanTab('sample')">
+                        <i class="fa-solid fa-images"></i> Demo Sample
+                    </button>
+                </div>
+
+                <!-- Upload Section -->
+                <div id="uploadSection" class="scan-tab-content">
+                    <form method="POST" action="{{ url_for('scan') }}" enctype="multipart/form-data" id="uploadForm">
+                        <div class="drop-zone" id="dropZone">
+                            <i class="fa-solid fa-images drop-icon"></i>
+                            <p class="drop-title">Drag and drop shelf photo here, or <span>Browse</span></p>
+                            <span class="drop-subtitle">Supports JPG, PNG, WEBP (Max 16MB)</span>
+                            <input type="file" name="image" id="fileInput" accept="image/*" class="file-hidden" onchange="previewSelectedFile(event)">
+                        </div>
+
+                        <div id="filePreviewWrap" class="file-preview-wrap" style="display:none;">
+                            <img id="filePreviewImg" src="" alt="File preview">
+                            <span id="fileNameBadge" class="badge badge-light mt-2"></span>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block mt-3" id="btnSubmitUpload">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Run AI Detection
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Webcam Section -->
+                <div id="webcamSection" class="scan-tab-content" style="display:none;">
+                    <div class="webcam-box">
+                        <video id="webcamVideo" autoplay playsinline style="display:none;"></video>
+                        <canvas id="webcamCanvas" style="display:none;"></canvas>
+                        <div id="webcamPlaceholder" class="webcam-placeholder">
+                            <i class="fa-solid fa-camera"></i>
+                            <p>Camera is currently stopped.</p>
+                            <button type="button" class="btn btn-primary" onclick="startWebcam()">
+                                <i class="fa-solid fa-play"></i> Start Camera
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="webcamControls" class="webcam-controls" style="display:none;">
+                        <button type="button" class="btn btn-success" onclick="captureWebcamSnapshot()">
+                            <i class="fa-solid fa-circle-dot"></i> Capture Shelf Photo
+                        </button>
+                        <button type="button" class="btn btn-outline" onclick="stopWebcam()">
+                            <i class="fa-solid fa-stop"></i> Stop Camera
+                        </button>
+                    </div>
+
+                    <!-- Hidden form for webcam capture submission -->
+                    <form method="POST" action="{{ url_for('scan') }}" id="webcamForm" style="display:none;">
+                        <input type="hidden" name="webcam_image" id="webcamImageData">
+                    </form>
+                </div>
+
+                <!-- Demo Sample Section -->
+                <div id="sampleSection" class="scan-tab-content" style="display:none;">
+                    <p class="text-secondary small mb-3">
+                        Select a pre-loaded retail store shelf image to run instant AI detection without needing an external camera:
+                    </p>
+                    <div class="sample-grid">
+                        <div class="sample-item" onclick="loadSampleImage('shelf_beverages.jpg')">
+                            <img src="{{ url_for('static', filename='samples/shelf_beverages.jpg') }}" alt="Beverage Shelf" onerror="this.src='https://images.unsplash.com/photo-1527864550417-7fd91fc51a46?w=400';">
+                            <div class="sample-caption">Beverage Shelf (Bottles & Cans)</div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detection Results Card -->
+        <div class="card scan-result-card">
+            <div class="card-header">
+                <h3><i class="fa-solid fa-chart-pie"></i> Detection Results & Inventory Sync</h3>
+                {% if scan_result %}
+                <span class="badge badge-success"><i class="fa-solid fa-check-circle"></i> Detection Success</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if scan_result %}
+                <div class="result-details">
+                    <!-- Annotated Image Display -->
+                    <div class="annotated-image-box">
+                        <img src="{{ url_for('static', filename='uploads/' + scan_result.annotated_image) }}" alt="AI Annotated Shelf" class="annotated-img">
+                        <div class="image-overlay-badge">
+                            Model: <strong>{{ scan_result.model_used }}</strong>
+                        </div>
+                    </div>
+
+                    <!-- Counts Breakdown -->
+                    <div class="detection-summary mt-3">
+                        <h4><i class="fa-solid fa-list-check"></i> {{ scan_result.matched_total }} of {{ scan_result.total_count }} objects matched to your products</h4>
+                        {% if scan_result.note %}<div class="scan-note"><i class="fa-solid fa-circle-info"></i> {{ scan_result.note }}</div>{% endif %}
+
+                        {% if scan_result.matched or scan_result.unmatched %}
+                        <form method="POST" action="{{ url_for('sync_scan_to_inventory') }}">
+                            <input type="hidden" name="detected_counts" value='{{ scan_result.sync_counts|tojson }}'>
+                            <input type="hidden" name="unmatched_counts" value='{{ scan_result.unmatched_counts|tojson }}'>
+
+                            {% if scan_result.matched %}
+                            <h5 class="scan-sub"><i class="fa-solid fa-circle-check text-success"></i> Recognised products</h5>
+                            <div class="detected-items-grid">
+                                {% for name, m in scan_result.matched.items() %}
+                                <div class="detected-item-pill"><span class="item-name">{{ name }}</span><span class="item-count">{{ m.count }} units{% if m.method == 'barcode' %} &middot; <i class="fa-solid fa-barcode"></i> barcode{% endif %}</span></div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            {% if scan_result.unmatched %}
+                            <h5 class="scan-sub"><i class="fa-solid fa-circle-question text-warning"></i> Not recognised</h5>
+                            <p class="small text-secondary">Choose what these are, or leave them on "Ignore". Nothing is added to your stock from a guess.</p>
+                            <div class="unmatched-list">
+                                {% for label, u in scan_result.unmatched.items() %}
+                                <div class="unmatched-row">
+                                    <div><strong>{{ u.count }} &times; {{ label }} (unidentified)</strong>{% if u.suggestion %}<span class="small text-muted">Possible look-alike (unconfirmed): {{ u.suggestion }}</span>{% endif %}</div>
+                                    <select name="assign::{{ label }}" class="form-control form-control-sm" aria-label="Assign {{ label }} to a product">
+                                        <option value="">Ignore</option>
+                                        {% for p in scan_result.products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+                                    </select>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            <div class="sync-inventory-box mt-4">
+                                <h5><i class="fa-solid fa-rotate"></i> Synchronize with Database</h5>
+                                <div class="sync-options">
+                                    <label class="radio-label"><input type="radio" name="sync_mode" value="update" checked><span><strong>Replace:</strong> set stock exactly to the counted number</span></label>
+                                    <label class="radio-label"><input type="radio" name="sync_mode" value="add"><span><strong>Add:</strong> add the counted number to existing stock</span></label>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-block mt-3"><i class="fa-solid fa-database"></i> Apply to Inventory</button>
+                            </div>
+                        </form>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <i class="fa-solid fa-robot text-muted"></i>
+                    <h4>No Active Scan Results</h4>
+                    <p>Upload a shelf photo or take a snapshot from your webcam on the left to run AI detection.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function loadSampleImage(filename) {
+        // Create a hidden form or fetch the sample image and submit it
+        const sampleUrl = "/static/samples/" + filename;
+        fetch(sampleUrl)
+            .then(res => res.blob())
+            .then(blob => {
+                const file = new File([blob], filename, { type: "image/jpeg" });
+                const container = new DataTransfer();
+                container.items.add(file);
+                document.getElementById('fileInput').files = container.files;
+                switchScanTab('upload');
+                previewSelectedFile({ target: { files: [file] } });
+            })
+            .catch(err => {
+                alert("Error loading sample image. Please upload an image directly.");
+            });
+    }
+</script>
+{% endblock %}

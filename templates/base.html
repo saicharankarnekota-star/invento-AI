@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}INVENTO AI{% endblock %} - Smart Inventory Management</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;700;800&family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- App CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body class="{% if not session.get('user') %}is-auth{% endif %}">
+    {% if session.get('user') %}
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <a href="{{ url_for('dashboard') }}" class="nav-brand">
+                <span class="brand-icon"><i class="fa-solid fa-boxes-stacked"></i></span>
+                <span class="brand-text">INVENTO <span class="ai-badge">AI</span></span>
+            </a>
+
+            <div class="nav-menu" id="navMenu">
+                <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <i class="fa-solid fa-chart-pie"></i> Dashboard
+                </a>
+                <a href="{{ url_for('products') }}" class="nav-link {% if 'product' in request.endpoint %}active{% endif %}">
+                    <i class="fa-solid fa-boxes-packing"></i> Products
+                </a>
+                <a href="{{ url_for('billing') }}" class="nav-link {% if request.endpoint == 'billing' %}active{% endif %}">
+                    <i class="fa-solid fa-cart-shopping"></i> Billing{% if cart_count %}<span class="cart-count">{{ cart_count }}</span>{% endif %}
+                </a>
+                <a href="{{ url_for('bills') }}" class="nav-link {% if request.endpoint in ('bills', 'bill_detail') %}active{% endif %}">
+                    <i class="fa-solid fa-receipt"></i> Bills
+                </a>
+                <a href="{{ url_for('scan') }}" class="nav-link {% if request.endpoint == 'scan' %}active{% endif %}">
+                    <i class="fa-solid fa-camera-retro"></i> AI Scan
+                </a>
+                <a href="{{ url_for('alerts') }}" class="nav-link {% if request.endpoint == 'alerts' %}active{% endif %}">
+                    <i class="fa-solid fa-triangle-exclamation"></i> Alerts
+                </a>
+                <a href="{{ url_for('reports') }}" class="nav-link {% if request.endpoint == 'reports' %}active{% endif %}">
+                    <i class="fa-solid fa-file-invoice-dollar"></i> Reports
+                </a>
+            </div>
+
+            <div class="nav-user">
+                <div class="user-pill" title="{{ session.get('email') }}">
+                    <i class="fa-solid fa-circle-user"></i>
+                    <span>{{ session.get('user') }}</span>
+                </div>
+                <a href="{{ url_for('logout') }}" class="btn-logout" title="Logout">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </a>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+
+    <!-- Main Content Area -->
+    <main class="main-wrapper">
+        <!-- Flash Messages -->
+        <div class="alerts-container">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category }}">
+                            <div class="alert-content">
+                                <i class="fa-solid {% if category == 'success' %}fa-circle-check{% elif category == 'danger' %}fa-circle-xmark{% elif category == 'warning' %}fa-triangle-exclamation{% else %}fa-circle-info{% endif %}"></i>
+                                <span>{{ message }}</span>
+                            </div>
+                            <button class="alert-close" onclick="this.parentElement.remove();">&times;</button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="app-footer">
+        <p>© 2026 INVENTO AI — Smart Inventory Management System Using Computer Vision & AI</p>
+    </footer>
+
+    <!-- App JS -->
+    <div class="toast-host" id="toastHost" aria-live="polite"></div>
+    {% if session.get('user') %}
+    <button class="bot-fab" id="botFab" type="button" aria-label="Open Invento assistant" aria-expanded="false"><i class="fa-solid fa-robot"></i><span>Ask Invento</span></button>
+    <section class="bot-panel" id="botPanel" hidden aria-label="Invento assistant">
+        <header class="bot-head"><div><strong>Invento Assistant</strong><span class="small">Ask about stock, prices, expiry, sales, bills</span></div><button type="button" id="botClose" class="bot-close" aria-label="Close assistant">&times;</button></header>
+        <div class="bot-log" id="botLog" role="log" aria-live="polite"></div>
+        <div class="bot-chips" id="botChips"></div>
+        <form id="botForm" class="bot-form" autocomplete="off"><input type="text" id="botInput" placeholder='Try "price of milk" or "add 2 soap"' aria-label="Message" maxlength="300"><button type="submit" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button></form>
+    </section>
+    {% endif %}
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
